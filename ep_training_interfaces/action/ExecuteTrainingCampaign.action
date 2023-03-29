@@ -1,0 +1,85 @@
+# An action used to execute a training campaign from start to finish.
+
+#
+# Goal
+#
+
+# The number of solutions to exercise in each generation.
+uint64 generation_solutions
+
+# The threshold that, if reached, deems a solution is acceptable.
+float64 convergence_threshold
+
+# The maximum number of generations allowed for the entire campaign.
+uint64 generation_limit
+
+# The maximum amount of time a solution can take, in seconds.
+float64 solution_time_limit
+
+# The number of offspring produced during each crossover operation, which
+# replace the lowest performing offspring of the current generation.
+uint64 crossover_offspring
+
+# The degree of mutability for each gene in each generation.
+float64 mutability
+
+# The name of the command interfaces to be used by the controller.
+string[] command_interface_names
+
+# The name of the state interfaces to be used by the controller.
+string[] state_interface_names
+
+# The number of desired agents to use. This must be less than or equal to the
+# number deployed at the start of the training deployment.
+ParallelAgentCount desired_parallel_agent_count
+
+# The desired URL to write the results to (a YAML file contaning the parameters
+# of the best solution).
+string parameters_file_url
+
+---
+
+#
+# Result
+#
+
+# Whether the campaign was a success (true) or not (false). If this is false,
+# the message should explain why it failed.
+bool success
+
+# An informational message, e.g. an error message if this failed.
+string message
+
+# The solution number of the current generation that was considered an
+# acceptable solution (this is only a valid value if success is true).
+uint64 solution
+
+# The fitness value associated with the solution (this is only a valid value if
+# success is true).
+float64 fitness
+
+# The generation number that the solution number was a part of (this is only a
+# valid value if success is true).
+uint64 generation
+
+---
+
+#
+# Feedback
+#
+
+# The number of generations whose solutions were exercised.
+uint64 generations
+
+# The number of solutions exercised in the current generation.
+uint64 solutions_exercised
+
+# The fitness value associated with the best solution so far.
+float64 best_fitness
+
+# Whether the physics simulation is currently active (true), or not (false).
+bool simulation_active
+
+# The ID of the agent that is causing the simulation to be paused (this is only
+# a valid value if simulation_active is false).
+uint8 agent_pausing_simulation
