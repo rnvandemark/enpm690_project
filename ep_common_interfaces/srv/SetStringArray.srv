@@ -1,0 +1,13 @@
+# Attempt to set a list of strings.
+
+# The list of strings to use.
+string[] value
+
+---
+
+# Whether or not the attempt was successful. If this is false, the message
+# should explain the error.
+bool success
+
+# Informational message.
+string message

@@ -16,6 +16,7 @@ find_package(rosidl_default_generators REQUIRED)
 rosidl_generate_interfaces(ep_common_interfaces
     "srv/GetDouble.srv"
     "srv/SetString.srv"
+    "srv/SetStringArray.srv"
 )
 
 ament_package()
