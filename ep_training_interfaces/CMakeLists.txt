@@ -14,6 +14,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(ep_training_interfaces
+    "msg/ExercisingSolutionFinishedReason.msg"
     "msg/ParallelAgentCount.msg"
 )
 
