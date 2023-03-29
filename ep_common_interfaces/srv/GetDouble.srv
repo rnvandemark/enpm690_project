@@ -1,0 +1,15 @@
+# Attempt to get a double value.
+
+# No request data
+
+---
+
+# Whether or not the attempt was successful. If this is false, the message
+# should explain the error.
+bool success
+
+# Informational message.
+string message
+
+# The desired double.
+float64 value
