@@ -5,6 +5,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ep_common REQUIRED)
 find_package(ep_common_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rosgraph_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 
 include_directories(include)
@@ -18,13 +19,29 @@ ament_target_dependencies(
     std_srvs
 )
 
+add_library(time_dependent_fitness_evaluator_i SHARED src/time_dependent_fitness_evaluator_i.cpp)
+ament_target_dependencies(
+    time_dependent_fitness_evaluator_i
+    ep_common
+    ep_common_interfaces
+    rclcpp
+    rosgraph_msgs
+    std_srvs
+)
+target_link_libraries(
+    time_dependent_fitness_evaluator_i
+    fitness_evaluator_i
+)
+
 install(
     DIRECTORY include/
     DESTINATION include
 )
 install(
-    TARGETS fitness_evaluator_i
-    EXPORT fitness_evaluator_iTargets
+    TARGETS
+        fitness_evaluator_i
+        time_dependent_fitness_evaluator_i
+    EXPORT ep_trainingTargets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
@@ -32,12 +49,13 @@ install(
 )
 
 ament_export_include_directories(include)
-ament_export_targets(fitness_evaluator_iTargets HAS_LIBRARY_TARGET)
+ament_export_targets(ep_trainingTargets HAS_LIBRARY_TARGET)
 ament_export_dependencies(
     ament_cmake
     ep_common
     ep_common_interfaces
     rclcpp
+    rosgraph_msgs
     std_srvs
 )
 ament_package()
