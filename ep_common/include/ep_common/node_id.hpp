@@ -15,6 +15,11 @@ public:
     NodeId(const uint8_t node_id);
 
     std::string get_formatted_topic(const std::string& base) const;
+
+    static std::string get_formatted_topic(
+        const std::string& base,
+        const uint8_t node_id
+    );
 };
 
 }   // namespaces
