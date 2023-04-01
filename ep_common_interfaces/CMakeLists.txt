@@ -12,11 +12,14 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(ep_common_interfaces
     "srv/GetDouble.srv"
+    "srv/GetFloat64MultiArray.srv"
     "srv/SetString.srv"
     "srv/SetStringArray.srv"
+    DEPENDENCIES std_msgs
 )
 
 ament_package()

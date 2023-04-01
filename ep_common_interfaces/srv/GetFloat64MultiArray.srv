@@ -1,0 +1,15 @@
+# Attempt to get the value of a multi-array of doubles.
+
+# No request data
+
+---
+
+# Whether or not the attempt was successful. If this is false, the message
+# should explain the error.
+bool success
+
+# Informational message.
+string message
+
+# The desired multi-array.
+std_msgs/Float64MultiArray value
