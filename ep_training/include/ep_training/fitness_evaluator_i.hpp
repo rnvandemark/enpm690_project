@@ -13,7 +13,7 @@ class FitnessEvaluatorI : public rclcpp::Node
 protected:
     const ep_common::NodeId node_id;
 
-    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_ssv;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr restart_ssv;
 
     rclcpp::Service<ep_common_interfaces::srv::GetDouble>::SharedPtr evaluate_solution_ssv;
 
@@ -21,7 +21,7 @@ public:
     explicit FitnessEvaluatorI(const uint8_t id);
 
 protected:
-    virtual void handle_reset_requests(
+    virtual void handle_restart_requests(
         const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
         std::shared_ptr<std_srvs::srv::Trigger::Response> res
     );

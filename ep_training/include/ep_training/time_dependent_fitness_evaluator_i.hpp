@@ -21,7 +21,7 @@ public:
 protected:
     virtual void simulator_clock_callback(const rosgraph_msgs::msg::Clock::SharedPtr msg);
 
-    virtual void handle_reset_requests(
+    virtual void handle_restart_requests(
         const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
         std::shared_ptr<std_srvs::srv::Trigger::Response> res
     ) override;

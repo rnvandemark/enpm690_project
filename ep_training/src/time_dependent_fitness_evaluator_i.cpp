@@ -27,11 +27,11 @@ void TimeDependentFitnessEvaluatorI::simulator_clock_callback(const rosgraph_msg
     }
 }
 
-void TimeDependentFitnessEvaluatorI::handle_reset_requests(
+void TimeDependentFitnessEvaluatorI::handle_restart_requests(
     const std::shared_ptr<std_srvs::srv::Trigger::Request> req,
     std::shared_ptr<std_srvs::srv::Trigger::Response> res)
 {
-    FitnessEvaluatorI::handle_reset_requests(req, res);
+    FitnessEvaluatorI::handle_restart_requests(req, res);
 
     init_timestamp_set = false;
 }
