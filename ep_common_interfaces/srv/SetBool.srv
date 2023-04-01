@@ -1,0 +1,13 @@
+# Attempt to set a boolean value.
+
+# The boolean value to use.
+bool value
+
+---
+
+# Whether or not the attempt was successful. If this is false, the message
+# should explain the error.
+bool success
+
+# Informational message.
+string message
