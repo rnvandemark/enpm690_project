@@ -12,60 +12,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
-
-
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, IncludeLaunchDescription, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.actions import Node
-
-import xacro
-
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     gazebo = IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([os.path.join(
-                    get_package_share_directory('gazebo_ros'), 'launch'), '/gazebo.launch.py']),
-             )
-
-    gazebo_ros2_control_demos_path = os.path.join(
-        get_package_share_directory('gazebo_ros2_control_demos'))
-
-    xacro_file = os.path.join(gazebo_ros2_control_demos_path,
-                              'urdf',
-                              'test_diff_drive.xacro.urdf')
-
-    doc = xacro.parse(open(xacro_file))
-    xacro.process_doc(doc)
-    params = {'robot_description': doc.toxml()}
-
-    node_robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        output='screen',
-        parameters=[params]
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare("gazebo_ros"),
+                "launch",
+                "gazebo.launch.py",
+            ])
+        ])
     )
 
-    spawn_entity = Node(package='gazebo_ros', executable='spawn_entity.py',
-                        arguments=['-topic', 'robot_description',
-                                   '-entity', 'cartpole'],
-                        output='screen')
+    robot_description = {
+        "robot_description": Command([
+            PathJoinSubstitution([FindExecutable(name="xacro")]),
+            " ",
+            PathJoinSubstitution([FindPackageShare("gazebo_ros2_control_demos"), "urdf", "test_diff_drive.xacro.urdf"]),
+        ])
+    }
+
+    node_robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        parameters=[robot_description],
+        output="both",
+    )
+
+    spawn_entity = Node(
+        package="gazebo_ros",
+        executable="spawn_entity.py",
+        arguments=[
+            "-topic", "robot_description",
+            "-entity", "cartpole",
+        ],
+        output="both",
+    )
 
     load_joint_state_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'start',
-             'joint_state_broadcaster'],
-        output='screen'
+        cmd=["ros2", "control", "load_controller", "--set-state", "start", "joint_state_broadcaster"],
+        output="both",
     )
 
     load_joint_trajectory_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'start',
-             'diff_drive_base_controller'],
-        output='screen'
+        cmd=["ros2", "control", "load_controller", "--set-state", "start", "diff_drive_base_controller"],
+        output="both",
     )
 
     return LaunchDescription([
