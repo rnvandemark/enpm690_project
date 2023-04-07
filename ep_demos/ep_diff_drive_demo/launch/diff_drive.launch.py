@@ -13,14 +13,25 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, IncludeLaunchDescription, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
+    controller_parameters_path = LaunchConfiguration("controller_parameters_path")
+    declare_controller_parameters_path_cmd = DeclareLaunchArgument(
+        "controller_parameters_path",
+        default_value=PathJoinSubstitution([
+            FindPackageShare("ep_diff_drive_demo"),
+            "config",
+            "sample.yaml",
+        ]),
+        description="The path to the YAML file of the parameters for the controller to use"
+    )
+
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             PathJoinSubstitution([
@@ -35,7 +46,9 @@ def generate_launch_description():
         "robot_description": Command([
             PathJoinSubstitution([FindExecutable(name="xacro")]),
             " ",
-            PathJoinSubstitution([FindPackageShare("gazebo_ros2_control_demos"), "urdf", "test_diff_drive.xacro.urdf"]),
+            PathJoinSubstitution([FindPackageShare("ep_diff_drive_demo"), "urdf", "diff_drive.urdf.xacro"]),
+            " controller_parameters_path:=",
+            controller_parameters_path,
         ])
     }
 

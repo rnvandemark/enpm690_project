@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="diff_drive">
+    <xacro:arg name="controller_parameters_path" default=""/>
+
+    <!-- Import our robot's ros2_control description -->
+    <xacro:include filename="$(find ep_diff_drive_demo)/urdf/diff_drive.ros2_control.xacro"/>
+
+    <!-- Generate the URDF for a robot node, including ROS2 control and gazebo plugins -->
+    <xacro:include filename="$(find ep_diff_drive_demo)/urdf/diff_drive_description.urdf"/>
+    <xacro:diff_drive_ros2_control controller_parameters_path="$(arg controller_parameters_path)"/>
+</robot>
