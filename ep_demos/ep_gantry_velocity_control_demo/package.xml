@@ -10,6 +10,10 @@
 
     <buildtool_depend>ament_cmake</buildtool_depend>
 
+    <depend>ep_common</depend>
+
+    <build_depend>pluginlib</build_depend>
+
     <export>
         <build_type>ament_cmake</build_type>
     </export>

@@ -1,0 +1,9 @@
+<library path="velocity_pid_controller">
+  <class name="ep_gantry_velocity_control_demo/VelocityPidController"
+         type="ep_gantry_velocity_control_demo::VelocityPidController"
+         base_class_type="controller_interface::ControllerInterface">
+  <description>
+    The velocity PID controller attempts to follow a desired velocity profile.
+  </description>
+  </class>
+</library>
