@@ -6,9 +6,11 @@ find_package(ep_common REQUIRED)
 find_package(ep_common_interfaces REQUIRED)
 find_package(ep_training_interfaces REQUIRED)
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rosgraph_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 
 include_directories(
@@ -82,9 +84,11 @@ ament_export_dependencies(
     ep_common
     ep_common_interfaces
     ep_training_interfaces
+    rcl_interfaces
     rclcpp
     rclcpp_action
     rosgraph_msgs
+    std_msgs
     std_srvs
 )
 ament_package()
