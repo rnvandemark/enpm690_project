@@ -205,40 +205,6 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
 
 #undef DEMUX_PARAM
 
-    // FOR PARALLEL AGENT COUNT := 0
-    // gen_num := 0
-    // convergence_reached := false
-    // do until convergence_reached or gen_num >= generation limit:
-    //   pause simulation physics
-    //   if gen_num is 0:
-    //     tell GA controller to reinit
-    //   else:
-    //     tell GA controller to breed (selection + crossover + mutation)
-    //   soln_num := 0
-    //   while soln_num is less than generation solution count:
-    //     soln_params := get GA controller solution parameter set soln_num
-    //     build command interface controller params from soln_params and control interface names
-    //     send params to command interface controller (and reinit sim scene)
-    //     restart simulation world
-    //     restart state observer
-    //     restart fitness evaluator
-    //     resume simulation physics
-    //     wait for state observer response
-    //     pause simulation physics
-    //     query solution performance
-    //     if convergence threshold reached:
-    //       convergence_reach := true
-    //       tell command interface controller to dump parameters to file
-    //     else:
-    //       continue
-    //     increment soln_num
-    //   increment gen_num
-    // if convergence_reach:
-    //   campaign success
-    // if gen_num >= generation limit:
-    //   campaign fail
-    //   TODO best solution gets dumped to file?
-
 #define CREATE_REQ(NAME, TYPE) auto NAME##_req = std::make_shared<TYPE::Request>()
 
     // Prepare containers that will be used often.
