@@ -18,6 +18,7 @@ rosidl_generate_interfaces(ep_common_interfaces
     "srv/GetDouble.srv"
     "srv/GetFloat64MultiArray.srv"
     "srv/SetBool.srv"
+    "srv/SetDouble.srv"
     "srv/SetString.srv"
     "srv/SetStringArray.srv"
     DEPENDENCIES std_msgs
