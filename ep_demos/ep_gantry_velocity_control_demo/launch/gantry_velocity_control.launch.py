@@ -13,10 +13,10 @@
 # limitations under the License.
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, LogInfo, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
@@ -30,6 +30,56 @@ def generate_launch_description():
             "sample.yaml",
         ]),
         description="The path to the YAML file of the parameters for the controller to use",
+    )
+
+    motion_profile_time_accelerating = LaunchConfiguration("motion_profile_time_accelerating")
+    declare_motion_profile_time_accelerating_cmd = DeclareLaunchArgument(
+        "motion_profile_time_accelerating",
+        default_value="",
+        description="The amount of time to spend accelerating and decelerating each in the motion.",
+    )
+
+    motion_profile_time_constant_velocity = LaunchConfiguration("motion_profile_time_constant_velocity")
+    declare_motion_profile_time_constant_velocity_cmd = DeclareLaunchArgument(
+        "motion_profile_time_constant_velocity",
+        default_value="",
+        description="The amount of time to spend at constant velocity in the motion.",
+    )
+
+    motion_profile_acceleration = LaunchConfiguration("motion_profile_acceleration")
+    declare_motion_profile_acceleration_cmd = DeclareLaunchArgument(
+        "motion_profile_acceleration",
+        default_value="",
+        description="The acceleration during the acceleration and deceleration sequences in the motion.",
+    )
+
+    target_displacement = LaunchConfiguration("target_displacement")
+    declare_target_displacement_cmd = DeclareLaunchArgument(
+        "target_displacement",
+        default_value=PythonExpression([
+            motion_profile_acceleration,
+            "*",
+            motion_profile_time_accelerating,
+            "*(",
+            motion_profile_time_accelerating,
+            "+",
+            motion_profile_time_constant_velocity,
+            ")",
+        ])
+    )
+    log_target_displacement = LogInfo(msg=[
+        "With acc = ", motion_profile_acceleration, " m/s^2, t_a = ", motion_profile_time_accelerating,
+        " s, t_cv = ", motion_profile_time_constant_velocity, " s -> dx = ", target_displacement, " m",
+    ])
+
+    target_displacement_is_positive = LaunchConfiguration("target_displacement_is_positive")
+    declare_target_displacement_is_positive_cmd = DeclareLaunchArgument(
+        "target_displacement_is_positive",
+        default_value=PythonExpression([
+            "True if (",
+            target_displacement,
+            " >= 0.0) else False",
+        ])
     )
 
     gazebo = IncludeLaunchDescription(
@@ -69,19 +119,68 @@ def generate_launch_description():
         output="both",
     )
 
-    load_joint_state_controller = ExecuteProcess(
-        cmd=["ros2", "control", "load_controller", "--set-state", "start", "joint_state_broadcaster"],
+    node_campaign_orchestrator_gui = Node(
+        package="ep_training",
+        executable="campaign_orchestrator_gui",
         output="both",
     )
 
-    load_joint_trajectory_controller = ExecuteProcess(
-        cmd=["ros2", "control", "load_controller", "--set-state", "start", "velocity_controller"],
+    node_genetic_algorithm_controller = Node(
+        package="ep_gantry_velocity_control_demo",
+        executable="pid_solution_genetic_algorithm_controller",
+        output="both",
+    )
+
+    node_state_observer = Node(
+        package="ep_gantry_velocity_control_demo",
+        executable="velocity_pid_state_observer",
+        parameters=[{
+            "use_sim_time": True,
+            "target_position": target_displacement,
+            "target_displacement_is_positive": target_displacement_is_positive,
+        }],
+        output="both",
+    )
+
+    node_fitness_evaluator = Node(
+        package="ep_gantry_velocity_control_demo",
+        executable="velocity_pid_fitness_evaluator",
+        parameters=[{
+            "profile.acceleration": motion_profile_acceleration,
+            "profile.t_accelerating": motion_profile_time_accelerating,
+            "profile.t_constant_velocity": motion_profile_time_constant_velocity,
+        }],
+        output="both",
+    )
+
+    load_joint_state_controller = ExecuteProcess(
+        cmd=["ros2", "control", "load_controller", "--set-state", "start", "joint_state_broadcaster"],
         output="both",
     )
 
     load_imu_sensor_broadcaster = ExecuteProcess(
         cmd=["ros2", "control", "load_controller", "imu_sensor_broadcaster"],
         output="both"
+    )
+
+    load_velocity_pid_controller = ExecuteProcess(
+        cmd=["ros2", "control", "load_controller", "command_interface_controller_0"],
+        output="both",
+    )
+
+    set_velocity_pid_controller_acceleration_param = ExecuteProcess(
+        cmd=["ros2", "param", "set", "command_interface_controller_0", "profile.acceleration", motion_profile_acceleration],
+        output="both",
+    )
+
+    set_velocity_pid_controller_t_accelerating_param = ExecuteProcess(
+        cmd=["ros2", "param", "set", "command_interface_controller_0", "profile.t_accelerating", motion_profile_time_accelerating],
+        output="both",
+    )
+
+    set_velocity_pid_controller_t_constant_velocity_param = ExecuteProcess(
+        cmd=["ros2", "param", "set", "command_interface_controller_0", "profile.t_constant_velocity", motion_profile_time_constant_velocity],
+        output="both",
     )
 
     return LaunchDescription([
@@ -94,17 +193,45 @@ def generate_launch_description():
         RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=load_joint_state_controller,
-                on_exit=[load_joint_trajectory_controller],
+                on_exit=[load_imu_sensor_broadcaster],
             )
         ),
         RegisterEventHandler(
             event_handler=OnProcessExit(
-                target_action=load_joint_trajectory_controller,
-                on_exit=[load_imu_sensor_broadcaster],
+                target_action=load_imu_sensor_broadcaster,
+                on_exit=[load_velocity_pid_controller],
+            )
+        ),
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=load_velocity_pid_controller,
+                on_exit=[set_velocity_pid_controller_acceleration_param],
+            )
+        ),
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=load_velocity_pid_controller,
+                on_exit=[set_velocity_pid_controller_t_accelerating_param],
+            )
+        ),
+        RegisterEventHandler(
+            event_handler=OnProcessExit(
+                target_action=load_velocity_pid_controller,
+                on_exit=[set_velocity_pid_controller_t_constant_velocity_param],
             )
         ),
         declare_controller_parameters_path_cmd,
+        declare_motion_profile_time_accelerating_cmd,
+        declare_motion_profile_time_constant_velocity_cmd,
+        declare_motion_profile_acceleration_cmd,
+        declare_target_displacement_cmd,
+        declare_target_displacement_is_positive_cmd,
+        log_target_displacement,
         gazebo,
         node_robot_state_publisher,
         spawn_entity,
+        node_campaign_orchestrator_gui,
+        node_genetic_algorithm_controller,
+        node_state_observer,
+        node_fitness_evaluator,
     ])

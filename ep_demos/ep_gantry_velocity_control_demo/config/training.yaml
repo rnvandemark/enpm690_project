@@ -1,0 +1,21 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    command_interface_controller_0:
+      type: ep_gantry_velocity_control_demo/VelocityPidController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    imu_sensor_broadcaster:
+      type: imu_sensor_broadcaster/IMUSensorBroadcaster
+
+command_interface_controller_0:
+  ros__parameters:
+    use_sim_time: true
+
+imu_sensor_broadcaster:
+  ros__parameters:
+    sensor_name: cart_imu_sensor
+    frame_id: imu
