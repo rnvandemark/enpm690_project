@@ -18,6 +18,15 @@ include_directories(
     ${CMAKE_CURRENT_BINARY_DIR}
 )
 
+add_library(state_observer_i SHARED src/state_observer_i.cpp)
+ament_target_dependencies(
+    state_observer_i
+    ep_common
+    ep_common_interfaces
+    ep_training_interfaces
+    rclcpp
+)
+
 add_library(fitness_evaluator_i SHARED src/fitness_evaluator_i.cpp)
 ament_target_dependencies(
     fitness_evaluator_i
@@ -63,6 +72,7 @@ install(
 )
 install(
     TARGETS
+        state_observer_i
         fitness_evaluator_i
         time_dependent_fitness_evaluator_i
     EXPORT ep_trainingTargets
