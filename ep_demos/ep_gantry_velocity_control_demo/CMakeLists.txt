@@ -31,6 +31,13 @@ ament_target_dependencies(
     rclcpp_action
 )
 
+add_executable(velocity_pid_state_observer src/velocity_pid_state_observer.cpp)
+ament_target_dependencies(
+    velocity_pid_state_observer
+    ep_training
+    sensor_msgs
+)
+
 install(
     DIRECTORY include/
     DESTINATION include
@@ -42,7 +49,9 @@ install(
     LIBRARY DESTINATION lib
 )
 install(
-    TARGETS pid_solution_genetic_algorithm_controller
+    TARGETS
+        pid_solution_genetic_algorithm_controller
+        velocity_pid_state_observer
     RUNTIME DESTINATION lib/${PROJECT_NAME}
     INCLUDES DESTINATION include
 )
