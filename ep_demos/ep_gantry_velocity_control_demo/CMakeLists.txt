@@ -38,6 +38,13 @@ ament_target_dependencies(
     sensor_msgs
 )
 
+add_executable(velocity_pid_fitness_evaluator src/velocity_pid_fitness_evaluator.cpp)
+ament_target_dependencies(
+    velocity_pid_fitness_evaluator
+    ep_training
+    sensor_msgs
+)
+
 install(
     DIRECTORY include/
     DESTINATION include
@@ -52,6 +59,7 @@ install(
     TARGETS
         pid_solution_genetic_algorithm_controller
         velocity_pid_state_observer
+        velocity_pid_fitness_evaluator
     RUNTIME DESTINATION lib/${PROJECT_NAME}
     INCLUDES DESTINATION include
 )
