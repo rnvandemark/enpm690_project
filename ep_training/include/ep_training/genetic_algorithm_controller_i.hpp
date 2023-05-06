@@ -2,6 +2,7 @@
 #define EP_TRAINING__GENETIC_ALGORITHM_CONTROLLER_I_HPP
 
 #include <ep_common_interfaces/srv/get_double.hpp>
+#include <ep_common_interfaces/srv/set_double.hpp>
 #include <ep_common_interfaces/srv/set_string.hpp>
 #include <ep_training_interfaces/action/execute_training_campaign.hpp>
 #include <ep_training_interfaces/msg/exercising_solution_finished_reason.hpp>
@@ -64,9 +65,9 @@ protected:
     // interface controller using its current set of control constants.
     std::vector<rclcpp::Client<ep_common_interfaces::srv::GetDouble>::SharedPtr> evaluate_solution_scl;
 
-    // A list of service clients used to restart the monitors of the parallel
-    // agents' completion criteria.
-    std::vector<rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr> restart_state_observer_scl;
+    // A list of service clients used to inform the monitors of the parallel
+    // agents' completion criteria that a new solution is about to start.
+    std::vector<rclcpp::Client<ep_common_interfaces::srv::SetDouble>::SharedPtr> inform_starting_exercising_solution_scl;
     // A list of subscribers of signals as to when and why a parallel agent has
     // met its completion criteria.
     std::vector<rclcpp::Subscription<ep_training_interfaces::msg::ExercisingSolutionFinishedReason>::SharedPtr> exercising_solution_finished_reason_sub;

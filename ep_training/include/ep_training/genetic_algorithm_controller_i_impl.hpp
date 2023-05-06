@@ -67,7 +67,7 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
     set_controller_parameters_scl(0), // Set in constructor body
     restart_fitness_evaluator_scl(0), // Set in constructor body
     evaluate_solution_scl(0), // Set in constructor body
-    restart_state_observer_scl(0), // Set in constructor body
+    inform_starting_exercising_solution_scl(0), // Set in constructor body
     exercising_solution_finished_reason_sub(0), // Set in constructor body
     reset_world_scl(create_client<std_srvs::srv::Empty>("gazebo/reset_world")),
     pause_simulation_scl(create_client<std_srvs::srv::Empty>("gazebo/pause_physics")),
@@ -78,7 +78,7 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
     set_controller_parameters_scl.reserve(max_parallel_agent_count);
     restart_fitness_evaluator_scl.reserve(max_parallel_agent_count);
     evaluate_solution_scl.reserve(max_parallel_agent_count);
-    restart_state_observer_scl.reserve(max_parallel_agent_count);
+    inform_starting_exercising_solution_scl.reserve(max_parallel_agent_count);
     exercising_solution_finished_reason_sub.reserve(max_parallel_agent_count);
     for (ep_training_interfaces::msg::ParallelAgentCount::_value_type i = 0; i < max_parallel_agent_count; i++)
     {
@@ -97,9 +97,9 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
                 ep_common::NodeId::get_formatted_topic("evaluate_solution", i)
             )
         );
-        restart_state_observer_scl.push_back(
-            create_client<std_srvs::srv::Trigger>(
-                ep_common::NodeId::get_formatted_topic("restart_state_observer", i)
+        inform_starting_exercising_solution_scl.push_back(
+            create_client<ep_common_interfaces::srv::SetDouble>(
+                ep_common::NodeId::get_formatted_topic("inform_starting_exercising_solution", i)
             )
         );
         exercising_solution_finished_reason_sub.push_back(
@@ -212,6 +212,7 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     CREATE_REQ(set_string, ep_common_interfaces::srv::SetString);
     CREATE_REQ(trigger, std_srvs::srv::Trigger);
     CREATE_REQ(get_double, ep_common_interfaces::srv::GetDouble);
+    CREATE_REQ(set_double, ep_common_interfaces::srv::SetDouble);
     CREATE_REQ(empty, std_srvs::srv::Empty);
     std::vector<rcl_interfaces::msg::Parameter> command_interface_controller_params;
 
@@ -331,8 +332,9 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
             // Reset the simulation world, state observer, and fitness
             // evaluators, then resume the simulation.
             HELP_PLACE_REQUEST(empty_req, reset_world_res, reset_world_scl, "reset simulation world")
-            HELP_PLACE_REQUEST(trigger_req, restart_state_observer_res, restart_state_observer_scl[0], "restart state observer")
-            ENSURE_REQ_SUCCESS(restart_state_observer_res, "Failed to restart state observer")
+            set_double_req->value = solution_time_limit;
+            HELP_PLACE_REQUEST(set_double_req, inform_starting_exercising_solution_res, inform_starting_exercising_solution_scl[0], "inform starting solution")
+            ENSURE_REQ_SUCCESS(inform_starting_exercising_solution_res, "Failed to inform state observer of solution starting")
             HELP_PLACE_REQUEST(trigger_req, restart_fitness_evaluator_res, restart_fitness_evaluator_scl[0], "restart fitness evaluator")
             ENSURE_REQ_SUCCESS(restart_fitness_evaluator_res, "Failed to restart fitness evaluator")
             HELP_PLACE_REQUEST(empty_req, play_simulation_res, play_simulation_scl, "play simulation world")
