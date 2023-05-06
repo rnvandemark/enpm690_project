@@ -36,6 +36,12 @@ protected:
     // A shorthand for a population, i.e. a list of solutions.
     using ScoredPopulationT = std::vector<ScoredSolnT>;
 
+    // The callback group dedicated to @a execute_training_campaign_asv.
+    rclcpp::CallbackGroup::SharedPtr callback_group_action_server;
+    // The callback group dedicated to the many service clients and subscribers
+    // that move the campaign along.
+    rclcpp::CallbackGroup::SharedPtr callback_group_execution;
+
     // The maximum number of parallel agents that can be orchestrated in the
     // simulators. Requested campaigns can have a parallel agent count less
     // than or equal to this.

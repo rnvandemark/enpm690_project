@@ -7,6 +7,15 @@
 
 #include <random>
 
+namespace {
+    rclcpp::SubscriptionOptions get_sub_options_with_callback_group(rclcpp::CallbackGroup::SharedPtr cb_group)
+    {
+        rclcpp::SubscriptionOptions options;
+        options.callback_group = cb_group;
+        return options;
+    }
+}
+
 using namespace std::placeholders;
 
 namespace ep_training {
@@ -54,6 +63,8 @@ void mutate_solution(SolnT& soln, const double mutability);
 template <typename SolnT>
 GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
     rclcpp::Node("genetic_algorithm_controller"),
+    callback_group_action_server(create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive)),
+    callback_group_execution(create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive)),
     max_parallel_agent_count(declare_parameter("max_parallel_agent_count", 1)),
     current_goal(nullptr),
     current_goal_feedback(nullptr),
@@ -62,16 +73,30 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
         "execute_training_campaign",
         std::bind(&ep_training::GeneticAlgorithmControllerI<SolnT>::handle_campaign_goal, this, _1, _2),
         std::bind(&ep_training::GeneticAlgorithmControllerI<SolnT>::handle_campaign_cancel, this, _1),
-        std::bind(&ep_training::GeneticAlgorithmControllerI<SolnT>::handle_campaign_accepted, this, _1)
+        std::bind(&ep_training::GeneticAlgorithmControllerI<SolnT>::handle_campaign_accepted, this, _1),
+        rcl_action_server_get_default_options(),
+        callback_group_action_server
     )),
     set_controller_parameters_scl(0), // Set in constructor body
     restart_fitness_evaluator_scl(0), // Set in constructor body
     evaluate_solution_scl(0), // Set in constructor body
     inform_starting_exercising_solution_scl(0), // Set in constructor body
     exercising_solution_finished_reason_sub(0), // Set in constructor body
-    reset_world_scl(create_client<std_srvs::srv::Empty>("gazebo/reset_world")),
-    pause_simulation_scl(create_client<std_srvs::srv::Empty>("gazebo/pause_physics")),
-    play_simulation_scl(create_client<std_srvs::srv::Empty>("gazebo/unpause_physics")),
+    reset_world_scl(create_client<std_srvs::srv::Empty>(
+        "reset_world",
+        rmw_qos_profile_services_default,
+        callback_group_execution
+    )),
+    pause_simulation_scl(create_client<std_srvs::srv::Empty>(
+        "pause_physics",
+        rmw_qos_profile_services_default,
+        callback_group_execution
+    )),
+    play_simulation_scl(create_client<std_srvs::srv::Empty>(
+        "unpause_physics",
+        rmw_qos_profile_services_default,
+        callback_group_execution
+    )),
     finished_reason_mutexes(max_parallel_agent_count),
     finished_reasons(max_parallel_agent_count)
 {
@@ -84,22 +109,30 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
     {
         set_controller_parameters_scl.push_back(
             create_client<rcl_interfaces::srv::SetParameters>(
-                ep_common::NodeId::get_formatted_topic("command_interface_controller", i) + "/set_parameters"
+                ep_common::NodeId::get_formatted_topic("command_interface_controller", i) + "/set_parameters",
+                rmw_qos_profile_services_default,
+                callback_group_execution
             )
         );
         restart_fitness_evaluator_scl.push_back(
             create_client<std_srvs::srv::Trigger>(
-                ep_common::NodeId::get_formatted_topic("restart_fitness_evaluator", i)
+                ep_common::NodeId::get_formatted_topic("restart_fitness_evaluator", i),
+                rmw_qos_profile_services_default,
+                callback_group_execution
             )
         );
         evaluate_solution_scl.push_back(
             create_client<ep_common_interfaces::srv::GetDouble>(
-                ep_common::NodeId::get_formatted_topic("evaluate_solution", i)
+                ep_common::NodeId::get_formatted_topic("evaluate_solution", i),
+                rmw_qos_profile_services_default,
+                callback_group_execution
             )
         );
         inform_starting_exercising_solution_scl.push_back(
             create_client<ep_common_interfaces::srv::SetDouble>(
-                ep_common::NodeId::get_formatted_topic("inform_starting_exercising_solution", i)
+                ep_common::NodeId::get_formatted_topic("inform_starting_exercising_solution", i),
+                rmw_qos_profile_services_default,
+                callback_group_execution
             )
         );
         exercising_solution_finished_reason_sub.push_back(
@@ -109,7 +142,8 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
                 [this, i](const ep_training_interfaces::msg::ExercisingSolutionFinishedReason::SharedPtr msg)
                 {
                     exercising_solution_finished_reason_callback(msg, i);
-                }
+                },
+                get_sub_options_with_callback_group(callback_group_execution)
             )
         );
     }
@@ -232,20 +266,19 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     bool simulation_active = true;
     // Each solutions' completion criteria status.
     std::vector<bool> solution_completion_criteria_met(desired_parallel_agent_count.value, false);
+    // Rate at which to query is a service response was received.
+    const std::chrono::duration<double> response_wait(0.02);
     // Rate at which to query for solution completion criteria.
     rclcpp::Rate poll_completion_rate(0.25);
 
     // Init the population of solutions.
     GeneticAlgorithmControllerI<SolnT>::ScoredPopulationT population;
 
-#define HELP_PLACE_REQUEST(REQ_NAME, RES_NAME, SCL, ERR_MSG) \
+#define HELP_PLACE_REQUEST(SRV_TYPE, REQ_NAME, RES_NAME, SCL) \
+    RCLCPP_INFO_STREAM(get_logger(), "Placing request with '" #SCL "'"); \
     auto RES_NAME = SCL->async_send_request(REQ_NAME); \
-    if (rclcpp::FutureReturnCode::SUCCESS != rclcpp::spin_until_future_complete(get_node_base_interface(), RES_NAME)) \
-    { \
-        result->message = std::string("Failed to place '") + ERR_MSG + "' request."; \
-        error_occurred = true; \
-        goto END_CAMPAIGN; \
-    }
+    while (std::future_status::ready != RES_NAME.wait_for(response_wait)) {} \
+    RCLCPP_INFO_STREAM(get_logger(), "Received response from '" #SCL "'")
 
 #define ENSURE_REQ_SUCCESS(RES_NAME, ERR_MSG) \
     if (!(RES_NAME.get()->success)) \
@@ -265,12 +298,43 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     // - we have encountered an error and set the error message
     TrainAction::Goal::_generation_limit_type generation_number = 0;
     double best_fitness_so_far = 0.0;
+
+#define VERIFY_NAMED_SERVICE_READY(SCL, NAME) \
+    if (SCL->wait_for_service(std::chrono::duration<double>(0.5))) \
+    { \
+        RCLCPP_INFO_STREAM(get_logger(), "Service '" << NAME << "' is ready."); \
+    } \
+    else \
+    { \
+        result->message = std::string("Service client '") + NAME + "' is not ready."; \
+        error_occurred = true; \
+        goto END_CAMPAIGN; \
+    }
+
+#define VERIFY_SERVICE_READY(SCL) VERIFY_NAMED_SERVICE_READY(SCL, #SCL)
+
+    // Real quick, make sure all of the service clients are connected to their
+    // respective servers.
+    VERIFY_SERVICE_READY(reset_world_scl)
+    VERIFY_SERVICE_READY(pause_simulation_scl)
+    VERIFY_SERVICE_READY(play_simulation_scl)
+    for (ep_training_interfaces::msg::ParallelAgentCount::_value_type i = 0; i < desired_parallel_agent_count.value; i++)
+    {
+        VERIFY_NAMED_SERVICE_READY(set_controller_parameters_scl[i], "set_controller_parameters_scl[" + std::to_string(i) + "]")
+        VERIFY_NAMED_SERVICE_READY(restart_fitness_evaluator_scl[i], "restart_fitness_evaluator_scl[" + std::to_string(i) + "]")
+        VERIFY_NAMED_SERVICE_READY(evaluate_solution_scl[i], "evaluate_solution_scl[" + std::to_string(i) + "]")
+        VERIFY_NAMED_SERVICE_READY(inform_starting_exercising_solution_scl[i], "inform_starting_exercising_solution_scl[" + std::to_string(i) + "]")
+    }
+
+#undef VERIFY_SERVICE_READY
+#undef VERIFY_NAMED_SERVICE_READY
+
     while (rclcpp::ok() && (!campaign_finished))
     {
         pub_feedback(generation_number, 0, best_fitness_so_far, simulation_active, 0);
 
         // Pause simulation.
-        HELP_PLACE_REQUEST(empty_req, pause_simulation_res, pause_simulation_scl, "pause simulation")
+        HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, pause_simulation_res, pause_simulation_scl);
         simulation_active = false;
         pub_feedback(generation_number, 0, best_fitness_so_far, simulation_active, 0);
 
@@ -310,11 +374,11 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
 
             // Set the parameters.
             HELP_PLACE_REQUEST(
+                rcl_interfaces::srv::SetParameters,
                 set_parameters_req,
                 set_controller_parameters_res,
-                set_controller_parameters_scl[0],
-                "set controller parameters"
-            )
+                set_controller_parameters_scl[0]
+            );
             for (
                 auto iter = set_controller_parameters_res.get()->results.cbegin();
                 iter != set_controller_parameters_res.get()->results.cend();
@@ -331,13 +395,23 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
 
             // Reset the simulation world, state observer, and fitness
             // evaluators, then resume the simulation.
-            HELP_PLACE_REQUEST(empty_req, reset_world_res, reset_world_scl, "reset simulation world")
+            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, reset_world_res, reset_world_scl);
             set_double_req->value = solution_time_limit;
-            HELP_PLACE_REQUEST(set_double_req, inform_starting_exercising_solution_res, inform_starting_exercising_solution_scl[0], "inform starting solution")
+            HELP_PLACE_REQUEST(
+                ep_common_interfaces::srv::SetDouble,
+                set_double_req,
+                inform_starting_exercising_solution_res,
+                inform_starting_exercising_solution_scl[0]
+            );
             ENSURE_REQ_SUCCESS(inform_starting_exercising_solution_res, "Failed to inform state observer of solution starting")
-            HELP_PLACE_REQUEST(trigger_req, restart_fitness_evaluator_res, restart_fitness_evaluator_scl[0], "restart fitness evaluator")
+            HELP_PLACE_REQUEST(
+                std_srvs::srv::Trigger,
+                trigger_req,
+                restart_fitness_evaluator_res,
+                restart_fitness_evaluator_scl[0]
+            );
             ENSURE_REQ_SUCCESS(restart_fitness_evaluator_res, "Failed to restart fitness evaluator")
-            HELP_PLACE_REQUEST(empty_req, play_simulation_res, play_simulation_scl, "play simulation world")
+            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, play_simulation_res, play_simulation_scl);
             simulation_active = true;
             pub_feedback(generation_number, solution_number, best_fitness_so_far, simulation_active, 0);
 
@@ -357,11 +431,16 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
             }
 
             // Pause simulation again.
-            HELP_PLACE_REQUEST(empty_req, loop_pause_simulation_res, pause_simulation_scl, "pause simulation")
+            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, loop_pause_simulation_res, pause_simulation_scl);
             simulation_active = false;
 
             // Evaluate the performance of this agent with this solution.
-            HELP_PLACE_REQUEST(get_double_req, evaluate_performance_res, evaluate_solution_scl[0], "evaluate performance")
+            HELP_PLACE_REQUEST(
+                ep_common_interfaces::srv::GetDouble,
+                get_double_req,
+                evaluate_performance_res,
+                evaluate_solution_scl[0]
+            );
             ENSURE_REQ_SUCCESS(evaluate_performance_res, "Failed to evaluate performance")
             population[solution_number].fitness = evaluate_performance_res.get()->value;
 
@@ -385,7 +464,12 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
                 result->generation = generation_number;
 
                 set_string_req->value = parameters_file_url;
-                HELP_PLACE_REQUEST(set_string_req, dump_params_res, dump_controller_parameters_scl[0], "dump controller parameters")
+                HELP_PLACE_REQUEST(
+                    ep_common_interfaces::srv::SetString,
+                    set_string_req,
+                    dump_params_res,
+                    dump_controller_parameters_scl[0]
+                );
                 ENSURE_REQ_SUCCESS(dump_params_res, "Failed to dump controller parameters")
 
                 convergence_reached = true;
