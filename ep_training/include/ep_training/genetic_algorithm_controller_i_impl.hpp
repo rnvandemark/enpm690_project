@@ -77,6 +77,16 @@ GeneticAlgorithmControllerI<SolnT>::GeneticAlgorithmControllerI() :
         rcl_action_server_get_default_options(),
         callback_group_action_server
     )),
+    configure_controller_scl(create_client<controller_manager_msgs::srv::ConfigureController>(
+        "controller_manager/configure_controller",
+        rmw_qos_profile_services_default,
+        callback_group_execution
+    )),
+    switch_controller_scl(create_client<controller_manager_msgs::srv::SwitchController>(
+        "controller_manager/switch_controller",
+        rmw_qos_profile_services_default,
+        callback_group_execution
+    )),
     set_controller_parameters_scl(0), // Set in constructor body
     restart_fitness_evaluator_scl(0), // Set in constructor body
     evaluate_solution_scl(0), // Set in constructor body
@@ -161,8 +171,10 @@ rclcpp_action::GoalResponse GeneticAlgorithmControllerI<SolnT>::handle_campaign_
     RCLCPP_INFO_STREAM(get_logger(), "- generation_limit = " << goal->generation_limit);
     RCLCPP_INFO_STREAM(get_logger(), "- solution_time_limit = " << goal->solution_time_limit);
     RCLCPP_INFO_STREAM(get_logger(), "- mutability = " << goal->mutability);
-    RCLCPP_INFO_STREAM(get_logger(), "- command_interface_names = [" << join(goal->command_interface_names) << "]");
-    RCLCPP_INFO_STREAM(get_logger(), "- state_interface_names = [" << join(goal->state_interface_names) << "]");
+    RCLCPP_INFO_STREAM(get_logger(), "- command_interface_names (" << goal->command_interface_names.size()
+                                        << ") = [" << join(goal->command_interface_names) << "]");
+    RCLCPP_INFO_STREAM(get_logger(), "- state_interface_names (" << goal->state_interface_names.size()
+                                        << ") = [" << join(goal->state_interface_names) << "]");
     RCLCPP_INFO_STREAM(get_logger(), "- desired_parallel_agent_count = " << static_cast<int>(goal->desired_parallel_agent_count.value));
     RCLCPP_INFO_STREAM(get_logger(), "- parameters_file_url = " << goal->parameters_file_url);
     return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
@@ -248,6 +260,8 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     CREATE_REQ(get_double, ep_common_interfaces::srv::GetDouble);
     CREATE_REQ(set_double, ep_common_interfaces::srv::SetDouble);
     CREATE_REQ(empty, std_srvs::srv::Empty);
+    CREATE_REQ(configure_controller, controller_manager_msgs::srv::ConfigureController);
+    CREATE_REQ(switch_controller, controller_manager_msgs::srv::SwitchController);
     std::vector<rcl_interfaces::msg::Parameter> command_interface_controller_params;
 
 #undef CREATE_REQ
@@ -270,6 +284,8 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     const std::chrono::duration<double> response_wait(0.02);
     // Rate at which to query for solution completion criteria.
     rclcpp::Rate poll_completion_rate(0.25);
+    // The TEMPORARILY hardcoded controller name.
+    const std::string controller_name = ep_common::NodeId::get_formatted_topic("command_interface_controller", 0);
 
     // Init the population of solutions.
     GeneticAlgorithmControllerI<SolnT>::ScoredPopulationT population;
@@ -284,6 +300,14 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     if (!(RES_NAME.get()->success)) \
     { \
         result->message = std::string(ERR_MSG) + ": " + (RES_NAME.get()->message) + "."; \
+        error_occurred = true; \
+        goto END_CAMPAIGN; \
+    }
+
+#define ENSURE_REQ_OK(RES_NAME, ERR_MSG) \
+    if (!(RES_NAME.get()->ok)) \
+    { \
+        result->message = std::string(ERR_MSG) + "."; \
         error_occurred = true; \
         goto END_CAMPAIGN; \
     }
@@ -315,6 +339,8 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
 
     // Real quick, make sure all of the service clients are connected to their
     // respective servers.
+    VERIFY_SERVICE_READY(configure_controller_scl)
+    VERIFY_SERVICE_READY(switch_controller_scl)
     VERIFY_SERVICE_READY(reset_world_scl)
     VERIFY_SERVICE_READY(pause_simulation_scl)
     VERIFY_SERVICE_READY(play_simulation_scl)
@@ -333,10 +359,10 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
     {
         pub_feedback(generation_number, 0, best_fitness_so_far, simulation_active, 0);
 
-        // Pause simulation.
-        HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, pause_simulation_res, pause_simulation_scl);
-        simulation_active = false;
-        pub_feedback(generation_number, 0, best_fitness_so_far, simulation_active, 0);
+//        // Pause simulation.
+//        HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, pause_simulation_res, pause_simulation_scl);
+//        simulation_active = false;
+//        pub_feedback(generation_number, 0, best_fitness_so_far, simulation_active, 0);
 
         // If this is the first generation, initialize the set of solutions. If
         // not, perform the selection/crossover/mutation process.
@@ -365,14 +391,15 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
             command_interface_controller_params = node_parameters_from_solution(population[solution_number].soln);
             rcl_interfaces::msg::Parameter interface_names_param;
             interface_names_param.value.type = rcl_interfaces::msg::ParameterType::PARAMETER_STRING_ARRAY;
-            interface_names_param.name = "command_interfaces";
-            interface_names_param.value.string_array_value = command_interface_names;
-            command_interface_controller_params.push_back(interface_names_param);
-            interface_names_param.name = "state_interfaces";
+            interface_names_param.name = "state_interface_names";
             interface_names_param.value.string_array_value = state_interface_names;
+            command_interface_controller_params.push_back(interface_names_param);
+            interface_names_param.name = "command_interface_names";
+            interface_names_param.value.string_array_value = command_interface_names;
             command_interface_controller_params.push_back(interface_names_param);
 
             // Set the parameters.
+            set_parameters_req->parameters = command_interface_controller_params;
             HELP_PLACE_REQUEST(
                 rcl_interfaces::srv::SetParameters,
                 set_parameters_req,
@@ -393,6 +420,28 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
                 }
             }
 
+            // (Re)Configure and (re)activate the controller.
+            configure_controller_req->name = controller_name;
+            HELP_PLACE_REQUEST(
+                controller_manager_msgs::srv::ConfigureController,
+                configure_controller_req,
+                configure_controller_res,
+                configure_controller_scl
+            );
+            ENSURE_REQ_OK(configure_controller_res, "Failed to configure controller")
+
+            switch_controller_req->start_controllers = {controller_name};
+            switch_controller_req->stop_controllers = {};
+            switch_controller_req->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
+            switch_controller_req->start_asap = false;
+            HELP_PLACE_REQUEST(
+                controller_manager_msgs::srv::SwitchController,
+                switch_controller_req,
+                activate_controller_res,
+                switch_controller_scl
+            );
+            ENSURE_REQ_OK(activate_controller_res, "Failed to activate controller")
+
             // Reset the simulation world, state observer, and fitness
             // evaluators, then resume the simulation.
             HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, reset_world_res, reset_world_scl);
@@ -411,9 +460,9 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
                 restart_fitness_evaluator_scl[0]
             );
             ENSURE_REQ_SUCCESS(restart_fitness_evaluator_res, "Failed to restart fitness evaluator")
-            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, play_simulation_res, play_simulation_scl);
-            simulation_active = true;
-            pub_feedback(generation_number, solution_number, best_fitness_so_far, simulation_active, 0);
+//            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, play_simulation_res, play_simulation_scl);
+//            simulation_active = true;
+//            pub_feedback(generation_number, solution_number, best_fitness_so_far, simulation_active, 0);
 
             // Wait until some completion criteria for this agent has been met.
             {
@@ -425,14 +474,35 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
             {
                 poll_completion_rate.sleep();
                 const std::lock_guard<std::mutex> lock(finished_reason_mutexes[0]);
+                const bool before = solution_completion_criteria_met[0];
                 solution_completion_criteria_met[0] = (
                     ep_training_interfaces::msg::ExercisingSolutionFinishedReason::UNKNOWN != finished_reasons[0].value
                 );
+                if (solution_completion_criteria_met[0] != before)
+                {
+                    RCLCPP_INFO_STREAM(
+                        get_logger(),
+                        "Solution finished! Reason: " << static_cast<int>(finished_reasons[0].value)
+                    );
+                }
             }
 
-            // Pause simulation again.
-            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, loop_pause_simulation_res, pause_simulation_scl);
-            simulation_active = false;
+//            // Pause simulation again.
+//            HELP_PLACE_REQUEST(std_srvs::srv::Empty, empty_req, loop_pause_simulation_res, pause_simulation_scl);
+//            simulation_active = false;
+
+            // (Re)deactivate the controller.
+            switch_controller_req->start_controllers = {};
+            switch_controller_req->stop_controllers = {controller_name};
+            switch_controller_req->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
+            switch_controller_req->start_asap = false;
+            HELP_PLACE_REQUEST(
+                controller_manager_msgs::srv::SwitchController,
+                switch_controller_req,
+                deactivate_controller_res,
+                switch_controller_scl
+            );
+            ENSURE_REQ_OK(deactivate_controller_res, "Failed to deactivate controller")
 
             // Evaluate the performance of this agent with this solution.
             HELP_PLACE_REQUEST(
@@ -486,6 +556,7 @@ void GeneticAlgorithmControllerI<SolnT>::execute_campaign(
         campaign_finished = (convergence_reached || generation_limit_reached || error_occurred);
     }
 
+#undef ENSURE_REQ_OK
 #undef ENSURE_REQ_SUCCESS
 #undef HELP_PLACE_REQUEST
 

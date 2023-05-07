@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(ep_training)
 
 find_package(ament_cmake REQUIRED)
+find_package(controller_manager_msgs REQUIRED)
 find_package(ep_common REQUIRED)
 find_package(ep_common_interfaces REQUIRED)
 find_package(ep_training_interfaces REQUIRED)
@@ -91,6 +92,7 @@ ament_export_include_directories(include)
 ament_export_targets(ep_trainingTargets HAS_LIBRARY_TARGET)
 ament_export_dependencies(
     ament_cmake
+    controller_manager_msgs
     ep_common
     ep_common_interfaces
     ep_training_interfaces

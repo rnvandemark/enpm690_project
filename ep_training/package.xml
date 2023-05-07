@@ -10,6 +10,7 @@
 
     <buildtool_depend>ament_cmake</buildtool_depend>
 
+    <depend>controller_manager_msgs</depend>
     <depend>ep_common</depend>
     <depend>ep_common_interfaces</depend>
     <depend>ep_training_interfaces</depend>

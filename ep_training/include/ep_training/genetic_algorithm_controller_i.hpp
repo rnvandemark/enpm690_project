@@ -1,6 +1,8 @@
 #ifndef EP_TRAINING__GENETIC_ALGORITHM_CONTROLLER_I_HPP
 #define EP_TRAINING__GENETIC_ALGORITHM_CONTROLLER_I_HPP
 
+#include <controller_manager_msgs/srv/configure_controller.hpp>
+#include <controller_manager_msgs/srv/switch_controller.hpp>
 #include <ep_common_interfaces/srv/get_double.hpp>
 #include <ep_common_interfaces/srv/set_double.hpp>
 #include <ep_common_interfaces/srv/set_string.hpp>
@@ -55,6 +57,12 @@ protected:
     // The action server to handle new campaign requests.
     rclcpp_action::Server<TrainAction>::SharedPtr execute_training_campaign_asv;
 
+    // A service client used to (re)configure controllers via the controller
+    // manager node.
+    rclcpp::Client<controller_manager_msgs::srv::ConfigureController>::SharedPtr configure_controller_scl;
+    // A service client used to switch which controllers are (de)activated via
+    // the controller manager node.
+    rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_scl;
     // A list of service clients to set the parameters of a command interface
     // controller, used to set the initial conditions and the control constants
     // of each active controller.
