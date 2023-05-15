@@ -88,3 +88,32 @@ This includes the custom action for executing training campaigns.
   older versions of Gazebo is still supported, automated generation of this
   stanza in the robots' URDFs. A nice-to-have would be a visual cue as to which
   is which, such as color-coding of the entire model.
+
+## Example use
+
+### Prerequisites
+
+- Install ROS Galactic desktop and other Gazebo and ROS2 control packages:
+```
+sudo apt-get install sudo apt-get install ros-galactic-desktop ros-galactic-gazebo-* ros-galactic-control*
+```
+- Clone this repository and build its packages via Colcon
+
+### Launching a demo
+
+WARNING: this is not yet functional, but this will be along the lines of the final
+instructions used to execute learning.
+
+- Launch the training environment to train a one degree of freedom gantry's
+  velocity PID controller whose trapezoidal velocity profile has the following
+  parameters (substituting '/path/to' appropriately):
+```
+ros2 launch ep_gantry_velocity_control_demo gantry_velocity_control.launch.py \
+    controller_parameters_path:=/path/to/src/enpm690_project/ep_demos/ep_gantry_velocity_control_demo/config/training.yaml \
+    initial_joint_position:=3.0 \
+    motion_profile_time_accelerating:=0.25 \
+    motion_profile_time_constant_velocity:=3.0 \
+    motion_profile_acceleration:=4.0
+```
+- Input the desired hyperparameters into the campaign orchestrator user
+  interface, the press 'Start' to start the training campaign.
