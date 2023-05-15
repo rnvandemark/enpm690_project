@@ -188,7 +188,12 @@ void CampaignOrchestratorGui::handle_campaign_feedback_gui_thread_callback(
     const std::shared_ptr<const TrainAction::Feedback> feedback
 )
 {
-    // TODO: handle campaign feedback callback in GUI thread
+    Q_D(CampaignOrchestratorGui);
+
+    d->ui->feedback_generation_number->setText(QString::number(feedback->generations));
+    d->ui->feedback_solution_number->setText(QString::number(feedback->solutions_exercised));
+    d->ui->feedback_best_fitness->setText(QString::number(feedback->best_fitness));
+    d->ui->feedback_simulation_active->setText(feedback->simulation_active ? "True" : "False");
 }
 
 void CampaignOrchestratorGui::handle_campaign_result_gui_thread_callback(
