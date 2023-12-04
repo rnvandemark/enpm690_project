@@ -30,7 +30,7 @@ CommandInterfaceControllerI::CommandInterfaceControllerI(const uint8_t id) :
 CommandInterfaceControllerI::LifecycleCallbackReturn CommandInterfaceControllerI::on_init()
 {
     try {
-        param_event_handler = std::make_shared<rclcpp::ParameterEventHandler>(node_);
+        param_event_handler = std::make_shared<rclcpp::ParameterEventHandler>(get_node());
 
         auto_declare<std::vector<std::string>>("state_interface_names", std::vector<std::string>());
         generate_param_callback("state_interface_names");
@@ -47,7 +47,7 @@ CommandInterfaceControllerI::LifecycleCallbackReturn CommandInterfaceControllerI
 
 CommandInterfaceControllerI::LifecycleCallbackReturn CommandInterfaceControllerI::on_configure(const rclcpp_lifecycle::State&)
 {
-    dump_controller_parameters_ssv = node_->create_service<ep_common_interfaces::srv::SetString>(
+    dump_controller_parameters_ssv = get_node()->create_service<ep_common_interfaces::srv::SetString>(
         node_id.get_formatted_topic("dump_controller_parameters"),
         std::bind(
             &ep_common::CommandInterfaceControllerI::handle_dump_controller_parameters_requests,
@@ -62,19 +62,19 @@ CommandInterfaceControllerI::LifecycleCallbackReturn CommandInterfaceControllerI
     if (command_interface_names.empty())
     {
         RCLCPP_ERROR_STREAM(
-            node_->get_logger(),
+            get_node()->get_logger(),
             "Command interface names parameter is empty!"
         );
         return CommandInterfaceControllerI::LifecycleCallbackReturn::ERROR;
     }
 
     RCLCPP_INFO_STREAM(
-        node_->get_logger(),
+        get_node()->get_logger(),
         "Command interface names: " << join(command_interface_names)
     );
 
     RCLCPP_INFO_STREAM(
-        node_->get_logger(),
+        get_node()->get_logger(),
         "State interface names: " << join(state_interface_names)
     );
 
@@ -125,7 +125,7 @@ controller_interface::return_type CommandInterfaceControllerI::update(
     if (fitness_results.size() != command_interfaces_.size())
     {
         RCLCPP_ERROR_STREAM(
-            node_->get_logger(),
+            get_node()->get_logger(),
             "Fitness results count (" << fitness_results.size()
                 << ") != command interface count (" << command_interfaces_.size() << ")"
         );
@@ -148,7 +148,7 @@ void CommandInterfaceControllerI::generate_param_callback(const std::string& par
         [this] (const rclcpp::Parameter& p)
         {
             RCLCPP_INFO_STREAM(
-                node_->get_logger(),
+                get_node()->get_logger(),
                 "Received an update to parameter '" << p.get_name() << "' of type '"
                     << p.get_type_name() << "': '" << p.value_to_string() << "'."
             );
@@ -167,8 +167,8 @@ bool CommandInterfaceControllerI::reset()
 void CommandInterfaceControllerI::set_solution_from_parameters()
 {
     // Capture specified state and command interfaces
-    state_interface_names = node_->get_parameter("state_interface_names").as_string_array();
-    command_interface_names = node_->get_parameter("command_interface_names").as_string_array();
+    state_interface_names = get_node()->get_parameter("state_interface_names").as_string_array();
+    command_interface_names = get_node()->get_parameter("command_interface_names").as_string_array();
 }
 
 void CommandInterfaceControllerI::handle_dump_controller_parameters_requests(

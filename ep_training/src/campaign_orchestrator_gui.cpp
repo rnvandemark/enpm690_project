@@ -54,7 +54,6 @@ CampaignOrchestratorGuiPrivate::CampaignOrchestratorGuiPrivate(CampaignOrchestra
         std::placeholders::_1
     ))
 {
-    qRegisterMetaType<std::shared_future<TrainActionGoalHandle::SharedPtr>>("std::shared_future<TrainActionGoalHandle::SharedPtr>");
     qRegisterMetaType<TrainActionGoalHandle::SharedPtr>("TrainActionGoalHandle::SharedPtr");
     qRegisterMetaType<std::shared_ptr<const TrainAction::Feedback>>("std::shared_ptr<const TrainAction::Feedback>");
     qRegisterMetaType<TrainActionGoalHandle::WrappedResult>("TrainActionGoalHandle::WrappedResult");
@@ -149,7 +148,7 @@ void CampaignOrchestratorGui::cancel_campaign_goal()
 }
 
 void CampaignOrchestratorGui::handle_campaign_goal_response_ros_thread_callback(
-    std::shared_future<CampaignOrchestratorGui::TrainActionGoalHandle::SharedPtr> future
+    CampaignOrchestratorGui::TrainActionGoalHandle::SharedPtr future
 )
 {
     emit announce_campaign_goal_response(future);
@@ -177,7 +176,7 @@ void CampaignOrchestratorGui::handle_campaign_result_ros_thread_callback(
 }
 
 void CampaignOrchestratorGui::handle_campaign_goal_response_gui_thread_callback(
-    std::shared_future<CampaignOrchestratorGui::TrainActionGoalHandle::SharedPtr> future
+    CampaignOrchestratorGui::TrainActionGoalHandle::SharedPtr future
 )
 {
     // TODO: handle campaign goal response callback in GUI thread

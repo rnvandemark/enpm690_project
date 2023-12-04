@@ -21,9 +21,9 @@ class CampaignOrchestratorGui : public QMainWindow
     Q_OBJECT;
 
 protected:
-    // Shorthand for the campaign training interface.
+    // Shorthands for types for the campaign action
     using TrainAction = ep_training_interfaces::action::ExecuteTrainingCampaign;
-    // Shorthand for a client to the campaign training service server.
+    using TrainActionClient = rclcpp_action::Client<TrainAction>;
     using TrainActionGoalHandle = rclcpp_action::ClientGoalHandle<TrainAction>;
 
 public:
@@ -36,7 +36,7 @@ public:
 Q_SIGNALS:
     // A signal used to handle GUI updates for handling a campaign goal
     // response in the Qt event thread.
-    void announce_campaign_goal_response(std::shared_future<TrainActionGoalHandle::SharedPtr> future);
+    void announce_campaign_goal_response(TrainActionGoalHandle::SharedPtr future);
 
     // A signal used to handle GUI updates for handling campaign feedbacks in
     // in the Qt event thread.
@@ -51,7 +51,7 @@ Q_SIGNALS:
 
 protected:
     // Handle campaign goal responses in the ROS thread.
-    void handle_campaign_goal_response_ros_thread_callback(std::shared_future<TrainActionGoalHandle::SharedPtr> future);
+    void handle_campaign_goal_response_ros_thread_callback(TrainActionGoalHandle::SharedPtr future);
 
     // Handle campaign feedback in the ROS thread.
     void handle_campaign_feedback_ros_thread_callback(
@@ -69,7 +69,7 @@ protected slots:
     void cancel_campaign_goal();
 
     // Handle campaign goal responses in the GUI thread.
-    void handle_campaign_goal_response_gui_thread_callback(std::shared_future<TrainActionGoalHandle::SharedPtr> future);
+    void handle_campaign_goal_response_gui_thread_callback(TrainActionGoalHandle::SharedPtr future);
 
     // Handle campaign feedback in the GUI thread.
     void handle_campaign_feedback_gui_thread_callback(
